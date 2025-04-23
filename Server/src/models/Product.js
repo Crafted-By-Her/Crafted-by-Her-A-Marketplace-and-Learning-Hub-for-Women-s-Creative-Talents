@@ -4,7 +4,10 @@ const productSchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
     description: String,
-    category: String,
+    category: {
+      type: String,
+      enum: ["Clothes", "Shoes", "Jewelries", "Beauties", "Bags", "Arts"],
+    },
     price: Number,
     images: [String],
     contactInfo: String,
