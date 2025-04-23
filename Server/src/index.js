@@ -9,7 +9,6 @@ const cors = require("cors");
 
 // Load env variables
 dotenv.config();
-
 // Connect to MongoDB
 connectDB();
 
@@ -29,7 +28,6 @@ app.use("/api/products", productRoutes);
 
 // Start the server
 const PORT = process.env.PORT || 5000;
-console.log("Check Check", process.env.PORT);
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
