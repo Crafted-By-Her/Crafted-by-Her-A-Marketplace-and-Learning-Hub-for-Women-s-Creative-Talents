@@ -5,56 +5,74 @@ const jwt = require("jsonwebtoken");
 // CREATE User
 const createUser = async (req, res) => {
   try {
-    const { firstName, lastName, email, password, phoneNumber, gender, role } =
-      req.body;
+    const isBulk = Array.isArray(req.body);
+    const usersToRegister = isBulk ? req.body : [req.body];
+    const registeredUsers = [];
 
-    // Check required fields
-    if (
-      !firstName ||
-      !lastName ||
-      !email ||
-      !password ||
-      !phoneNumber ||
-      !gender
-    ) {
-      return res.status(400).json({ error: "All fields are required" });
-    }
+    for (const user of usersToRegister) {
+      const {
+        firstName,
+        lastName,
+        email,
+        password,
+        phoneNumber,
+        gender,
+        role,
+      } = user;
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(409).json({ error: "Email already registered" });
-    }
+      // Validation
+      if (
+        !firstName ||
+        !lastName ||
+        !email ||
+        !password ||
+        !phoneNumber ||
+        !gender
+      ) {
+        return res.status(400).json({ error: "All fields are required" });
+      }
 
-    // // Hash the password
-    const hashedPassword = await bcrypt.hash(password, 10);
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        return res
+          .status(409)
+          .json({ error: `Email already registered: ${email}` });
+      }
 
-    // Create user
-    const newUser = new User({
-      firstName, // Matches schema
-      lastName, // Matches schema
-      email,
-      password: hashedPassword,
-      phoneNumber, // Matches schema
-      gender,
-      role: role || "user", // default to 'user' if not provided
-      warnings: 0,
-      isActive: true, // Matches schema
-    });
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 10);
 
-    const saved = await newUser.save();
+      // Create user
+      const newUser = new User({
+        firstName,
+        lastName,
+        email,
+        password: hashedPassword,
+        phoneNumber,
+        gender,
+        role: role || "user",
+        warnings: 0,
+        isActive: true,
+      });
 
-    res.status(201).json({
-      message: "User registered successfully",
-      user: {
+      const saved = await newUser.save();
+      registeredUsers.push({
         id: saved._id,
         firstName: saved.firstName,
         lastName: saved.lastName,
         email: saved.email,
-      },
+      });
+    }
+
+    return res.status(201).json({
+      message: isBulk
+        ? "Users registered successfully"
+        : "User registered successfully",
+      users: registeredUsers,
     });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    console.error("Registration error:", err);
+    return res.status(500).json({ error: err.message });
   }
 };
 
@@ -95,6 +113,7 @@ const loginUser = async (req, res) => {
         lastName: user.lastName,
         email: user.email,
         phoneNumber: user.phoneNumber,
+        profilePhoto: user.profilePhoto,
         gender: user.gender,
         role: user.role,
       },
