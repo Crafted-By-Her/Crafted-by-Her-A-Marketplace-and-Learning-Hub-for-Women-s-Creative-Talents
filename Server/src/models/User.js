@@ -13,7 +13,7 @@ const UserSchema = new mongoose.Schema({
     required: true,
     validate: {
       validator: function (v) {
-        return /^\+?[0-9]{9,15}$/.test(v); // Basic international phone validation
+        return /^\+?[0-9]{9,15}$/.test(v);
       },
       message: (props) => `${props.value} is not a valid phone number!`,
     },
@@ -23,6 +23,10 @@ const UserSchema = new mongoose.Schema({
     type: String,
     enum: ["user", "admin", "superAdmin"],
     default: "user",
+  },
+  profilePhoto: {
+    type: String,
+    default: "", // or set a placeholder URL
   },
   warnings: { type: Number, default: 0 },
   isActive: { type: Boolean, default: true },
