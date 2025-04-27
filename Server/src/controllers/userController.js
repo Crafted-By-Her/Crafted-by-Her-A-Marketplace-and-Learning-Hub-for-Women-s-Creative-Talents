@@ -17,7 +17,7 @@ const createUser = async (req, res) => {
         password,
         phoneNumber,
         gender,
-        role,
+        role = "user", // Default to 'user'
       } = user;
 
       // Validation
@@ -32,11 +32,21 @@ const createUser = async (req, res) => {
         return res.status(400).json({ error: "All fields are required" });
       }
 
+      // Prevent non-superAdmins from creating admin/superAdmin accounts
+      if (
+        ["admin", "superAdmin"].includes(role) &&
+        req.user?.role !== "superAdmin"
+      ) {
+        return res.status(403).json({
+          error: "Insufficient privileges to create admin users",
+        });
+      }
+
       const existingUser = await User.findOne({ email });
       if (existingUser) {
-        return res
-          .status(409)
-          .json({ error: `Email already registered: ${email}` });
+        return res.status(409).json({
+          error: `Email already registered: ${email}`,
+        });
       }
 
       // Hash password
@@ -50,7 +60,7 @@ const createUser = async (req, res) => {
         password: hashedPassword,
         phoneNumber,
         gender,
-        role: role || "user",
+        role,
         warnings: 0,
         isActive: true,
       });
@@ -61,6 +71,7 @@ const createUser = async (req, res) => {
         firstName: saved.firstName,
         lastName: saved.lastName,
         email: saved.email,
+        role: saved.role,
       });
     }
 
@@ -123,11 +134,22 @@ const loginUser = async (req, res) => {
   }
 };
 
-
 // READ All Users
 const getUsers = async (req, res) => {
   try {
-    const users = await User.find();
+    // Set projection based on user role
+    let projection = {};
+    if (req.user?.role === "user") {
+      projection = {
+        firstName: 1,
+        lastName: 1,
+        profilePhoto: 1,
+        email: 1,
+        gender: 1,
+      };
+    }
+
+    const users = await User.find({}, projection);
     res.json(users);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -137,7 +159,19 @@ const getUsers = async (req, res) => {
 // READ One User
 const getUserById = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
+    // Set projection based on user role
+    let projection = {};
+    if (req.user?.role === "user") {
+      projection = {
+        firstName: 1,
+        lastName: 1,
+        profilePhoto: 1,
+        email: 1,
+        gender: 1,
+      };
+    }
+
+    const user = await User.findById(req.params.id, projection);
     if (!user) return res.status(404).json({ error: "User not found" });
     res.json(user);
   } catch (err) {
@@ -148,9 +182,22 @@ const getUserById = async (req, res) => {
 // UPDATE User
 const updateUser = async (req, res) => {
   try {
+    // Prevent non-superAdmins from changing roles
+    if (req.body.role && req.user?.role !== "superAdmin") {
+      return res.status(403).json({
+        error: "Only super admins can change user roles",
+      });
+    }
+
     const updated = await User.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
+      runValidators: true,
     });
+
+    if (!updated) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
     res.json(updated);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -160,10 +207,103 @@ const updateUser = async (req, res) => {
 // DELETE User
 const deleteUser = async (req, res) => {
   try {
+    // Prevent deleting super admins unless by another super admin
+    const userToDelete = await User.findById(req.params.id);
+    if (
+      userToDelete?.role === "superAdmin" &&
+      req.user?.role !== "superAdmin"
+    ) {
+      return res.status(403).json({
+        error: "Cannot delete super admin accounts",
+      });
+    }
+
+    // Prevent users from deleting themselves
+    if (req.params.id === req.user?.id) {
+      return res.status(400).json({
+        error: "Cannot delete your own account via this endpoint",
+      });
+    }
+
     await User.findByIdAndDelete(req.params.id);
-    res.json({ message: "User deleted" });
+    res.json({ message: "User deleted successfully" });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+};
+
+// Get current user profile
+const getCurrentUser = async (req, res) => {
+  try {
+    res.json({
+      id: req.user._id,
+      firstName: req.user.firstName,
+      lastName: req.user.lastName,
+      email: req.user.email,
+      phoneNumber: req.user.phoneNumber,
+      profilePhoto: req.user.profilePhoto,
+      gender: req.user.gender,
+      role: req.user.role,
+      warnings: req.user.warnings,
+      isActive: req.user.isActive,
+      createdAt: req.user.createdAt,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Update current user profile
+const updateCurrentUser = async (req, res) => {
+  try {
+    const updates = Object.keys(req.body);
+    const allowedUpdates = [
+      "firstName",
+      "lastName",
+      "phoneNumber",
+      "gender",
+      "profilePhoto",
+      "password",
+    ];
+
+    const isValidOperation = updates.every((update) =>
+      allowedUpdates.includes(update)
+    );
+
+    if (!isValidOperation) {
+      return res.status(400).json({ error: "Invalid updates!" });
+    }
+
+    // Explicitly remove restricted fields
+    delete req.body.role;
+    delete req.body.isActive;
+    delete req.body.warnings;
+
+    // Handle password change
+    if (req.body.password) {
+      req.body.password = await bcrypt.hash(req.body.password, 10);
+    }
+
+    const user = await User.findByIdAndUpdate(req.user._id, req.body, {
+      new: true,
+      runValidators: true,
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({
+      id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      phoneNumber: user.phoneNumber,
+      profilePhoto: user.profilePhoto,
+      gender: user.gender,
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 };
 
@@ -174,4 +314,6 @@ module.exports = {
   getUserById,
   updateUser,
   deleteUser,
+  getCurrentUser,
+  updateCurrentUser,
 };
