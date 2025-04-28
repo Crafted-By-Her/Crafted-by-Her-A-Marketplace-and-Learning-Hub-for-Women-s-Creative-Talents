@@ -1,9 +1,14 @@
 const express = require("express");
 const router = express.Router();
+const { auth, authRole } = require("../middlewares/auth");
 const userController = require("../controllers/userController");
 
-router.post("/register", userController.createUser);
-router.post("/login", userController.loginUser);
+// All routes require authentication
+router.use(auth);
+
+// Only admins and superAdmins can access these
+router.use(authRole("admin")); 
+
 router.get("/", userController.getUsers);
 router.get("/:id", userController.getUserById);
 router.put("/:id", userController.updateUser);

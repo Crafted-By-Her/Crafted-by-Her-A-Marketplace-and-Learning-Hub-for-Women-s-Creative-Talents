@@ -5,19 +5,18 @@ const adminSchema = new mongoose.Schema(
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      unique: true,
       required: true,
+      unique: true,
     },
-    canDeletePosts: { type: Boolean, default: true },
-    canManageUsers: { type: Boolean, default: false },
-    canHandleReports: { type: Boolean, default: true },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
   },
-  { timestamps: true }
+  {
+    timestamps: { createdAt: true, updatedAt: false }, // Only track createdAt
+  }
 );
 
 module.exports = mongoose.model("Admin", adminSchema);
