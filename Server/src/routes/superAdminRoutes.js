@@ -5,9 +5,6 @@ const { auth, authRole } = require("../middlewares/auth");
 const superAdminController = require("../controllers/superAdminController");
 const userController = require("../controllers/userController")
 
-// Public super admin login route
-router.post("/login", superAdminLogin);
-
 // Protected super admin routes
 router.use(auth);
 router.use(authRole("superAdmin"));

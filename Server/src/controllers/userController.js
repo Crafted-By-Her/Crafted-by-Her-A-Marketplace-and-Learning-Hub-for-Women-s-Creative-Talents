@@ -1,4 +1,4 @@
-const { User } = require("../models");
+const { User, Admin } = require("../models");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
@@ -66,6 +66,16 @@ const createUser = async (req, res) => {
       });
 
       const saved = await newUser.save();
+      
+      // If creating admin, create admin record
+      if (role === "admin" || role === "superAdmin") {
+        const newAdmin = new Admin({
+          userId: saved._id,
+          createdBy: req.user?.id || saved._id // Self-created if superAdmin
+        });
+        await newAdmin.save();
+      }
+
       registeredUsers.push({
         id: saved._id,
         firstName: saved.firstName,
@@ -105,15 +115,48 @@ const loginUser = async (req, res) => {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
+    // Verify admin status if role is admin
+    let verifiedRole = user.role;
+    if (user.role === "admin") {
+      const adminRecord = await Admin.findOne({ userId: user._id }).populate(
+        "createdBy",
+        "role email"
+      );
+
+      // If admin record exists and was created by superAdmin
+      if (adminRecord && adminRecord.createdBy.role === "superAdmin") {
+        verifiedRole = "admin"; // Verified admin
+      } else {
+        verifiedRole = "user"; // Downgrade to user if not properly created
+        await User.findByIdAndUpdate(user._id, { role: "user" });
+      }
+    }
+
     const token = jwt.sign(
       {
         id: user._id,
         email: user.email,
-        role: user.role,
+        role: verifiedRole, // Use verified role in token
       },
-      process.env.JWT_SECRET || "your-secret-key",
+      process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
+
+    // Determine interface access based on verified role
+    const interfaceAccess = {
+      dashboard:
+        verifiedRole === "user"
+          ? "user"
+          : verifiedRole === "admin"
+          ? "admin"
+          : "superAdmin",
+      features:
+        verifiedRole === "user"
+          ? ["products", "profile"]
+          : verifiedRole === "admin"
+          ? ["products", "users", "reports"]
+          : ["products", "users", "admins", "reports", "system"],
+    };
 
     res.json({
       message: "Login successful",
@@ -126,11 +169,16 @@ const loginUser = async (req, res) => {
         phoneNumber: user.phoneNumber,
         profilePhoto: user.profilePhoto,
         gender: user.gender,
-        role: user.role,
+        role: verifiedRole, // Return verified role
+        interfaceAccess, // Include interface access information
       },
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("Login error:", err);
+    res.status(500).json({
+      error: "Login failed",
+      details: process.env.NODE_ENV === "development" ? err.message : undefined,
+    });
   }
 };
 

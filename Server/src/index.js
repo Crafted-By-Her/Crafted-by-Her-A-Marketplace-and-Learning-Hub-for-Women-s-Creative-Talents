@@ -42,7 +42,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/admins", adminRoutes); 
 app.use("/api/super-admin", superAdminRoutes);
 app.use("/api/products", productRoutes);
-app.use("/ratings", ratingRoutes);
+app.use("/api/ratings", ratingRoutes);
 
 
 // Start the server
