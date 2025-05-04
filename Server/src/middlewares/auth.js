@@ -3,30 +3,23 @@ const User = require("../models/User");
 
 const auth = async (req, res, next) => {
   try {
-    // Get token from header
     const token = req.header("Authorization")?.replace("Bearer ", "");
 
     if (!token) {
       return res.status(401).json({ error: "No token, authorization denied" });
     }
 
-    // Verify token
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET
-    );
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Find user and check if token hasn't been revoked
-    const user = await User.findOne({
-      _id: decoded.id,
-      // You could add token to user model if you want to implement token invalidation
-    });
+    const user = await User.findOne({ _id: decoded.id });
 
     if (!user) {
       return res.status(401).json({ error: "Invalid token" });
     }
 
-    // Add user and token to request object
+    // Log user role for debugging
+    console.log(`Auth Middleware - User ID: ${user._id}, Role: ${user.role}`);
+
     req.token = token;
     req.user = user;
 
@@ -43,21 +36,19 @@ const auth = async (req, res, next) => {
   }
 };
 
-// Middleware to check if user has specific role
-const authRole = (requiredRole) => {
+const authRole = (requiredRoles) => {
   return (req, res, next) => {
     const userRole = req.user?.role;
+    const roles = Array.isArray(requiredRoles)
+      ? requiredRoles
+      : [requiredRoles];
 
-    // Define role hierarchy
-    const roleHierarchy = {
-      user: 1,
-      admin: 2,
-      superAdmin: 3,
-    };
+    console.log(`AuthRole Check - User: ${userRole}, Required: ${roles}`);
 
-    if (!userRole || roleHierarchy[userRole] < roleHierarchy[requiredRole]) {
+    if (!userRole || !roles.includes(userRole)) {
       return res.status(403).json({
-        error: `Access denied. ${requiredRole} privileges required.`,
+        error: `Access denied. Requires one of: ${roles.join(", ")}`,
+        yourRole: userRole,
       });
     }
 

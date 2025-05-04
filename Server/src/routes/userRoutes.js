@@ -6,7 +6,7 @@ const userController = require("../controllers/userController");
 // All routes require authentication
 router.use(auth);
 
-// Only admins and superAdmins can access these
+
 router.use(authRole("admin")); 
 
 router.get("/", userController.getUsers);

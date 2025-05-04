@@ -182,7 +182,69 @@ const loginUser = async (req, res) => {
   }
 };
 
-// READ All Users
+// User: Change password
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+    const userId = req.user.id; // From auth middleware
+
+    // Validate input
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return res.status(400).json({ error: "Current password, new password, and confirm password are required" });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: "New password must be at least 8 characters" });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ error: "New password and confirm password do not match" });
+    }
+
+    // Restrict to users with role: "user"
+    if (req.user.role !== "user") {
+      return res.status(403).json({ error: "Only users can change their password via this endpoint" });
+    }
+
+    // Get user
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Verify current password
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ error: "Current password is incorrect" });
+    }
+
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // Update password
+    user.password = hashedPassword;
+    await user.save();
+
+    res.json({
+      message: "Password updated successfully",
+      userId: user._id,
+      email: user.email,
+      updatedAt: user.updatedAt,
+    });
+  } catch (error) {
+    console.error(
+      "🔥 ERROR in changePassword:",
+      JSON.stringify(error, Object.getOwnPropertyNames(error))
+    );
+    res.status(500).json({
+      error: "Failed to change password",
+      details: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+};
+
+// READ All Users (only role: "user")
 const getUsers = async (req, res) => {
   try {
     // Set projection based on user role
@@ -197,9 +259,20 @@ const getUsers = async (req, res) => {
       };
     }
 
-    const users = await User.find({}, projection);
-    res.json(users);
+    // Get users with role: "user", sorted by isActive (false first, then true)
+    const users = await User.find({ role: "user" }, projection)
+      .sort({ isActive: 1 }); // 1 = ascending (false comes before true in MongoDB)
+    
+    res.json({
+      message: "Users retrieved successfully",
+      count: users.length,
+      users,
+    });
   } catch (err) {
+    console.error(
+      "🔥 ERROR in getUsers:",
+      JSON.stringify(err, Object.getOwnPropertyNames(err))
+    );
     res.status(500).json({ error: err.message });
   }
 };
@@ -358,6 +431,7 @@ const updateCurrentUser = async (req, res) => {
 module.exports = {
   createUser,
   loginUser,
+  changePassword,
   getUsers,
   getUserById,
   updateUser,

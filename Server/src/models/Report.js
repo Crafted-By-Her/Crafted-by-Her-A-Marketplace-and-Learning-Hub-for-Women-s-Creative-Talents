@@ -1,3 +1,4 @@
+// models/Report.js
 const mongoose = require("mongoose");
 
 const reportSchema = new mongoose.Schema(
@@ -7,15 +8,30 @@ const reportSchema = new mongoose.Schema(
       ref: "Product",
       required: true,
     },
-    reportedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
+    overallScore: {
+      type: Number,
+      min: 0,
+      max: 100,
     },
-    reason: { type: String, required: true },
-    status: { type: String, default: "pending" },
-    handledBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" },
-    actionTaken: String,
+    aiAnalysis: {
+      summary: String,
+      strengths: [String],
+      weaknesses: [String],
+      suggestions: [String],
+    },
+    ratingDistribution: {
+      type: Map,
+      of: Number,
+    },
+    sentimentAnalysis: {
+      positive: Number,
+      neutral: Number,
+      negative: Number,
+    },
+    generatedAt: {
+      type: Date,
+      default: Date.now,
+    },
   },
   { timestamps: true }
 );
