@@ -47,7 +47,7 @@ const uploadProductImages = multer({
 // Multer middleware for profile photo (single image)
 const uploadProfilePhoto = multer({
   storage: profilePhotoStorage,
-  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB limit
+  limits: { fileSize: 5 * 1024 * 1024 }, // 2MB limit
 }).single("profilePhoto");
 
 // Function to delete file from Cloudinary
