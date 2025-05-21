@@ -1,65 +1,67 @@
 const multer = require("multer");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const cloudinary = require("cloudinary").v2;
 const path = require("path");
-const fs = require("fs");
-const { promisify } = require("util");
 
-const mkdirAsync = promisify(fs.mkdir);
-const existsAsync = promisify(fs.exists);
+// Load environment variables (fallback if not loaded in index.js)
+require("dotenv").config({ path: path.join(__dirname, "../.env") });
 
-const uploadDir = path.join(__dirname, "../public/uploads");
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
-const storage = multer.diskStorage({
-  destination: async function (req, file, cb) {
-    const exists = await existsAsync(uploadDir);
-    if (!exists) await mkdirAsync(uploadDir, { recursive: true });
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, "img-" + uniqueSuffix + path.extname(file.originalname));
+// Debug Cloudinary config
+console.log("Cloudinary configuration:", {
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME ? "Set" : "Not set",
+  api_key: process.env.CLOUDINARY_API_KEY ? "Set" : "Not set",
+  api_secret: process.env.CLOUDINARY_API_SECRET ? "Set" : "Not set",
+});
+
+// Storage for product images
+const productStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "products",
+    allowed_formats: ["jpg", "png", "jpeg"],
   },
 });
 
-const fileFilter = (req, file, cb) => {
-  const filetypes = /jpe?g|png|gif|webp/;
-  const mimetype = filetypes.test(file.mimetype);
-  const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-
-  if (mimetype && extname) return cb(null, true);
-  cb(new Error("Only image files (jpeg, png, gif, webp) are allowed!"), false);
-};
-
-const upload = multer({
-  storage,
-  fileFilter,
-  limits: {
-    fileSize: 3 * 1024 * 1024, // 3MB
-    files: 3, // Max 3 files
+// Storage for profile photos
+const profilePhotoStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "profilePhotos",
+    allowed_formats: ["jpg", "png", "jpeg"],
   },
-}).array("images", 3);
+});
 
-// Wrap multer middleware for async/await
-const uploadProductImages = (req, res, next) => {
-  upload(req, res, function (err) {
-    if (err instanceof multer.MulterError) {
-      // A Multer error occurred
-      if (err.code === "LIMIT_FILE_SIZE") {
-        return res.status(400).json({
-          error: "Each image must be less than 3MB",
-        });
-      }
-      if (err.code === "LIMIT_FILE_COUNT") {
-        return res.status(400).json({
-          error: "Maximum 3 images allowed",
-        });
-      }
-      return res.status(400).json({ error: err.message });
-    } else if (err) {
-      // An unknown error occurred
-      return res.status(400).json({ error: err.message });
-    }
-    next();
-  });
+// Multer middleware for product images (up to 5 images)
+const uploadProductImages = multer({
+  storage: productStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+}).array("images", 5);
+
+// Multer middleware for profile photo (single image)
+const uploadProfilePhoto = multer({
+  storage: profilePhotoStorage,
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB limit
+}).single("profilePhoto");
+
+// Function to delete file from Cloudinary
+const deleteFile = async (publicId) => {
+  try {
+    await cloudinary.uploader.destroy(publicId);
+  } catch (error) {
+    console.error("Error deleting file from Cloudinary:", error);
+    throw error;
+  }
 };
 
-module.exports = uploadProductImages;
+module.exports = {
+  uploadProductImages,
+  uploadProfilePhoto,
+  deleteFile,
+};

@@ -1,0 +1,1098 @@
+openapi: 3.0.3
+info:
+  title: Crafted By Her API
+  description: API for the Crafted By Her e-commerce platform, developed as part of Safaricom Training Gebeya. Manages products, users, ratings, reports, and admin functionalities.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: https://functional-full-s-int.trycloudflare.com
+    description: Production server
+tags:
+  - name: Auth
+    description: Authentication operations
+  - name: Users
+    description: User-related operations
+  - name: Products
+    description: Product management operations
+  - name: Ratings
+    description: Product rating and comment operations
+  - name: Reports
+    description: Product report operations
+  - name: Admin
+    description: Admin and SuperAdmin shared operations
+  - name: SuperAdmin
+    description: SuperAdmin-specific operations
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Product:
+      type: object
+      properties:
+        _id:
+          type: string
+          description: Unique product identifier
+        title:
+          type: string
+          description: Product title
+        description:
+          type: string
+          description: Product description
+        userId:
+          type: object
+          properties:
+            _id:
+              type: string
+              description: User ID
+            firstName:
+              type: string
+              description: User's first name
+            lastName:
+              type: string
+              description: User's last name
+            email:
+              type: string
+              description: User's email
+            warnings:
+              type: integer
+              description: Number of warnings issued to the user
+          required:
+            - _id
+            - firstName
+            - email
+        averageRating:
+          type: number
+          description: Average rating of the product
+        isActive:
+          type: boolean
+          description: Product activation status
+        createdAt:
+          type: string
+          format: date-time
+          description: Product creation timestamp
+        updatedAt:
+          type: string
+          format: date-time
+          description: Product last update timestamp
+        overallScore:
+          type: number
+          description: Overall score of the product
+      required:
+        - _id
+        - title
+        - description
+        - userId
+        - isActive
+        - createdAt
+        - updatedAt
+        - overallScore
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique user identifier
+        firstName:
+          type: string
+          description: User's first name
+        lastName:
+          type: string
+          description: User's last name
+        email:
+          type: string
+          description: User email address
+        phoneNumber:
+          type: string
+          description: User's phone number
+        profilePhoto:
+          type: string
+          description: URL to user's profile photo
+        gender:
+          type: string
+          enum: [male, female, other]
+          description: User's gender
+        role:
+          type: string
+          enum: [user, admin, superadmin]
+          description: User role
+        interfaceAccess:
+          type: object
+          properties:
+            dashboard:
+              type: string
+              description: Dashboard type
+            features:
+              type: array
+              items:
+                type: string
+              description: Accessible features
+          required:
+            - dashboard
+            - features
+        warnings:
+          type: integer
+          description: Number of warnings issued to the user
+        isActive:
+          type: boolean
+          description: User account activation status
+      required:
+        - id
+        - firstName
+        - lastName
+        - email
+        - role
+    Rating:
+      type: object
+      properties:
+        _id:
+          type: string
+          description: Unique rating identifier
+        productId:
+          type: string
+          description: ID of the rated product
+        userId:
+          type: string
+          description: ID of the user who submitted the rating
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Rating score (1-5)
+        comment:
+          type: string
+          description: User comment on the product
+      required:
+        - _id
+        - productId
+        - userId
+        - rating
+    Report:
+      type: object
+      properties:
+        _id:
+          type: string
+          description: Unique report identifier
+        productId:
+          type: string
+          description: ID of the reported product
+        reason:
+          type: string
+          description: Reason for the report
+        reportedBy:
+          type: string
+          description: ID of the user who submitted the report
+      required:
+        - _id
+        - productId
+        - reason
+        - reportedBy
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          default: false
+        message:
+          type: string
+          description: Error message
+      required:
+        - success
+        - message
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          description: User email
+        password:
+          type: string
+          description: User password
+      required:
+        - email
+        - password
+    LoginResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Response message
+        token:
+          type: string
+          description: JWT token for authentication
+        user:
+          $ref: "#/components/schemas/User"
+      required:
+        - message
+        - token
+        - user
+    RegisterRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+          description: User's first name
+        lastName:
+          type: string
+          description: User's last name
+        email:
+          type: string
+          description: User email
+        password:
+          type: string
+          description: User password
+        phoneNumber:
+          type: string
+          description: User's phone number
+        gender:
+          type: string
+          enum: [male, female, other]
+          description: User's gender
+      required:
+        - firstName
+        - lastName
+        - email
+        - password
+        - phoneNumber
+        - gender
+    RegisterResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Response message
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+      required:
+        - message
+        - users
+paths:
+  /api/auth/register:
+    post:
+      summary: Register a new user
+      description: Creates a new user account
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterResponse"
+        "400":
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/auth/login:
+    post:
+      summary: User or Admin login
+      description: Authenticates a user or admin and returns a JWT token
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/users/my-products:
+    get:
+      summary: Get user's own products
+      description: Retrieves all products created by the authenticated user
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Successfully retrieved user's products
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  count:
+                    type: integer
+                  products:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Product"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/users/ratings:
+    get:
+      summary: Get user's own ratings
+      description: Retrieves all ratings submitted by the authenticated user
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Successfully retrieved user's ratings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  count:
+                    type: integer
+                  ratings:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Rating"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/products:
+    get:
+      summary: Get all products
+      description: Retrieves a list of all products, optionally filtered by category
+      tags:
+        - Products
+      parameters:
+        - in: query
+          name: category
+          schema:
+            type: string
+            enum:
+              [
+                Clothes,
+                Shoes,
+                Jewelries,
+                Beauties,
+                Bags,
+                Arts,
+                All,
+                New Release,
+              ]
+          description: Filter products by category
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+          description: Page number for pagination
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+          description: Number of products per page
+      responses:
+        "200":
+          description: Successfully retrieved products
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  count:
+                    type: integer
+                  products:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Product"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: Create a new product
+      description: Creates a new product (user authentication required)
+      tags:
+        - Products
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                category:
+                  type: string
+                  enum:
+                    [
+                      Clothes,
+                      Shoes,
+                      Jewelries,
+                      Beauties,
+                      Bags,
+                      Arts,
+                      New Release,
+                    ]
+              required:
+                - title
+                - description
+                - category
+      responses:
+        "201":
+          description: Product created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/ratings:
+    post:
+      summary: Add rating and comment
+      description: Adds a rating and comment for a product (user authentication required)
+      tags:
+        - Ratings
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                productId:
+                  type: string
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                comment:
+                  type: string
+              required:
+                - productId
+                - rating
+      responses:
+        "201":
+          description: Rating added successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rating"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/reports:
+    get:
+      summary: Get product report
+      description: Retrieves reports for a specific product (admin access required)
+      tags:
+        - Reports
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: productId
+          schema:
+            type: string
+          description: ID of the product to retrieve reports for
+          required: true
+      responses:
+        "200":
+          description: Successfully retrieved reports
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  count:
+                    type: integer
+                  reports:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Report"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/products:
+    get:
+      summary: Admin get products
+      description: Retrieves all products for admin (admin access required)
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Successfully retrieved products
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  count:
+                    type: integer
+                  products:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Product"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /admin/products/{id}:
+    delete:
+      summary: Delete product
+      description: Deletes a product by ID (admin access required)
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+          required: true
+          description: Product ID
+      responses:
+        "204":
+          description: Product deleted successfully
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/users/{id}/warnings:
+    patch:
+      summary: Increment user warning
+      description: Increments the warning count for a user and potentially deactivates the account (admin access required)
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+          required: true
+          description: User ID
+      responses:
+        "200":
+          description: Warning incremented successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  userId:
+                    type: string
+                  warnings:
+                    type: integer
+                  isActive:
+                    type: boolean
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/password:
+    put:
+      summary: Admin change password
+      description: Updates the admin's password (admin access required)
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                oldPassword:
+                  type: string
+                newPassword:
+                  type: string
+              required:
+                - oldPassword
+                - newPassword
+      responses:
+        "200":
+          description: Password updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "401":
+          description: Unauthorized or invalid password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/users:
+    get:
+      summary: Get all users
+      description: Retrieves all users (admin access required)
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Successfully retrieved users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  count:
+                    type: integer
+                  users:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/users/{id}/activate:
+    patch:
+      summary: Activate user
+      description: Activates a user account (admin access required)
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+          required: true
+          description: User ID
+      responses:
+        "200":
+          description: User activated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/users/{id}:
+    delete:
+      summary: Delete user
+      description: Deletes a user by ID (admin access required)
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+          required: true
+          description: User ID
+      responses:
+        "204":
+          description: User deleted successfully
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/profile:
+    put:
+      summary: Update admin profile
+      description: Updates the admin's profile information (admin access required)
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstName:
+                  type: string
+                lastName:
+                  type: string
+                profilePhoto:
+                  type: string
+                phoneNumber:
+                  type: string
+                gender:
+                  type: string
+                  enum: [male, female, other]
+      responses:
+        "200":
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/admin/reports/{id}:
+    get:
+      summary: Product report detail
+      description: Retrieves detailed report for a product (admin access required)
+      tags:
+        - Admin
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+          required: true
+          description: Product ID
+      responses:
+        "200":
+          description: Successfully retrieved report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/superadmin/login:
+    post:
+      summary: SuperAdmin login
+      description: Authenticates a superadmin and returns a JWT token
+      tags:
+        - SuperAdmin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/superadmin/products:
+    get:
+      summary: SuperAdmin get products
+      description: Retrieves all products for superadmin (superadmin access required)
+      tags:
+        - SuperAdmin
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Successfully retrieved products
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  count:
+                    type: integer
+                  products:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Product"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/superadmin/dashboard:
+    get:
+      summary: Admin dashboard
+      description: Retrieves dashboard data for superadmin (superadmin access required)
+      tags:
+        - SuperAdmin
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Successfully retrieved dashboard data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      totalUsers:
+                        type: integer
+                      totalProducts:
+                        type: integer
+                      totalReports:
+                        type: integer
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/superadmin/admins:
+    post:
+      summary: Create new admin
+      description: Creates a new admin account (superadmin access required)
+      tags:
+        - SuperAdmin
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                firstName:
+                  type: string
+                lastName:
+                  type: string
+                password:
+                  type: string
+                phoneNumber:
+                  type: string
+                gender:
+                  type: string
+                  enum: [male, female, other]
+              required:
+                - email
+                - firstName
+                - lastName
+                - password
+      responses:
+        "201":
+          description: Admin created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    get:
+      summary: Get all admins
+      description: Retrieves all admin accounts (superadmin access required)
+      tags:
+        - SuperAdmin
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Successfully retrieved admins
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  count:
+                    type: integer
+                  admins:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/superadmin/admins/{id}:
+    delete:
+      summary: Delete admin
+      description: Deletes an admin by ID (superadmin access required)
+      tags:
+        - SuperAdmin
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+          required: true
+          description: Admin ID
+      responses:
+        "204":
+          description: Admin deleted successfully
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/superadmin/users/inactive:
+    get:
+      summary: Get all inactive users
+      description: Retrieves all inactive user accounts (superadmin access required)
+      tags:
+        - SuperAdmin
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Successfully retrieved inactive users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  count:
+                    type: integer
+                  users:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/superadmin/profile:
+    put:
+      summary: Update superadmin information
+      description: Updates the superadmin's profile information (superadmin access required)
+      tags:
+        - SuperAdmin
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstName:
+                  type: string
+                lastName:
+                  type: string
+                profilePhoto:
+                  type: string
+                phoneNumber:
+                  type: string
+                gender:
+                  type: string
+                  enum: [male, female, other]
+      responses:
+        "200":
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"

@@ -1,17 +1,24 @@
 const express = require("express");
 const router = express.Router();
-const { auth, authRole } = require("../middlewares/auth");
 const userController = require("../controllers/userController");
+const productController = require("../controllers/productController");
+const ratingController = require("../controllers/ratingController")
+const { auth } = require("../middlewares/auth");
+const { uploadProfilePhoto } = require("../middlewares/upload");
 
-// All routes require authentication
+// Protected routes
 router.use(auth);
 
+// Profile updates with photo upload
+router.put("/profile", uploadProfilePhoto, userController.updateProfile);
 
-router.use(authRole("admin")); 
+router.put("/password", userController.changePassword);
 
-router.get("/", userController.getUsers);
-router.get("/:id", userController.getUserById);
-router.put("/:id", userController.updateUser);
-router.delete("/:id", userController.deleteUser);
+router.get(
+  "/my-products",
+  productController.getUserProducts
+);
+
+router.get("/product-ratings", ratingController.getUserProductRatings);
 
 module.exports = router;

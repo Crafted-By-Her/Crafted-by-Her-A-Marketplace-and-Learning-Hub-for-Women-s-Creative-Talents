@@ -1,89 +1,7 @@
 const { User, Admin } = require("../models");
 const bcrypt = require("bcrypt");
-const nodemailer = require("nodemailer");
-
-const updateSuperAdminProfile = async (req, res) => {
-  try {
-    const {
-      firstName,
-      lastName,
-      email,
-      phoneNumber,
-      gender,
-      currentPassword,
-      newPassword,
-    } = req.body;
-    const superAdminId = req.user.id; // From auth middleware
-
-    // Get the superadmin
-    const superAdmin = await User.findById(superAdminId);
-    if (!superAdmin || superAdmin.role !== "superAdmin") {
-      return res.status(403).json({ error: "Unauthorized access" });
-    }
-
-    // Prepare update object
-    const updates = {};
-    if (firstName) updates.firstName = firstName;
-    if (lastName) updates.lastName = lastName;
-    if (phoneNumber) updates.phoneNumber = phoneNumber;
-    if (gender) updates.gender = gender;
-
-    // Email update requires special handling
-    if (email && email !== superAdmin.email) {
-      const emailExists = await User.findOne({ email });
-      if (emailExists) {
-        return res.status(400).json({ error: "Email already in use" });
-      }
-      updates.email = email;
-    }
-
-    // Password change requires verification
-    if (newPassword) {
-      if (!currentPassword) {
-        return res
-          .status(400)
-          .json({ error: "Current password is required to change password" });
-      }
-
-      const isMatch = await bcrypt.compare(
-        currentPassword,
-        superAdmin.password
-      );
-      if (!isMatch) {
-        return res.status(401).json({ error: "Current password is incorrect" });
-      }
-
-      if (newPassword.length < 8) {
-        return res
-          .status(400)
-          .json({ error: "New password must be at least 8 characters" });
-      }
-
-      const salt = await bcrypt.genSalt(10);
-      updates.password = await bcrypt.hash(newPassword, salt);
-    }
-
-    // Apply updates
-    const updatedAdmin = await User.findByIdAndUpdate(
-      superAdminId,
-      { $set: updates },
-      { new: true, runValidators: true }
-    ).select("-password"); // Exclude password from response
-
-    res.json({
-      message: "Profile updated successfully",
-      admin: updatedAdmin,
-    });
-  } catch (error) {
-    console.error("SuperAdmin update error:", error);
-    res.status(500).json({
-      error: "Failed to update profile",
-      details:
-        process.env.NODE_ENV === "development" ? error.message : undefined,
-    });
-  }
-};
-
+const { deleteFile } = require("../middlewares/upload");
+const sendEmail = require("../services/sendEmail");
 
 const getDashboard = async (req, res) => {
   try {
@@ -101,24 +19,62 @@ const getDashboard = async (req, res) => {
       Admin.find()
         .populate({
           path: "userId",
-          select: "firstName lastName email role isActive createdAt",
+          select:
+            "firstName lastName email role isActive createdAt profilePhoto",
         })
         .populate({
           path: "createdBy",
-          select: "firstName lastName email",
+          select: "firstName lastName email profilePhoto",
         })
         .lean(),
     ]);
 
+    // Transform profilePhoto for admins and creators
+    const transformedAdmins = admins.map((admin) => {
+      let userProfilePhoto =
+        admin.userId?.profilePhoto?.url || admin.userId?.profilePhoto;
+      if (
+        userProfilePhoto &&
+        typeof userProfilePhoto === "string" &&
+        !userProfilePhoto.startsWith("http")
+      ) {
+        userProfilePhoto = `${
+          process.env.BASE_URL || "http://localhost:8080"
+        }${userProfilePhoto}`;
+      }
+
+      let creatorProfilePhoto =
+        admin.createdBy?.profilePhoto?.url || admin.createdBy?.profilePhoto;
+      if (
+        creatorProfilePhoto &&
+        typeof creatorProfilePhoto === "string" &&
+        !creatorProfilePhoto.startsWith("http")
+      ) {
+        creatorProfilePhoto = `${
+          process.env.BASE_URL || "http://localhost:8080"
+        }${creatorProfilePhoto}`;
+      }
+
+      return {
+        _id: admin._id,
+        userInfo: {
+          ...admin.userId,
+          profilePhoto: userProfilePhoto,
+        },
+        createdBy: admin.createdBy
+          ? {
+              ...admin.createdBy,
+              profilePhoto: creatorProfilePhoto,
+            }
+          : null,
+        createdAt: admin.createdAt,
+      };
+    });
+
     res.json({
       message: "Super Admin Dashboard",
       stats,
-      admins: admins.map((admin) => ({
-        _id: admin._id,
-        userInfo: admin.userId,
-        createdBy: admin.createdBy,
-        createdAt: admin.createdAt,
-      })),
+      admins: transformedAdmins,
     });
   } catch (error) {
     console.error("Dashboard error:", error);
@@ -130,12 +86,13 @@ const getDashboard = async (req, res) => {
   }
 };
 
+// Create Admin
 const createAdmin = async (req, res) => {
   try {
     const { email, firstName, lastName, phoneNumber, gender, password } =
       req.body;
 
-    // Validation (unchanged)
+    // Validation
     if (
       !email ||
       !firstName ||
@@ -188,46 +145,25 @@ const createAdmin = async (req, res) => {
 
     await adminRecord.save();
 
-    console.log(process.env.EMAIL_USERNAME);
-    console.log(process.env.EMAIL_PASSWORD);
-    // Email configuration
-    const transporter = nodemailer.createTransport({
-      service: "Gmail",
-      auth: {
-        user: process.env.EMAIL_USERNAME,
-        pass: process.env.EMAIL_PASSWORD,
-      },
-    });
-
-    // Then update your mailOptions to use your email for both from and replyTo:
-    const mailOptions = {
-      from: '"Crafted By Her" <your@gmail.com>',
-      to: email,
-      replyTo: process.env.EMAIL_USERNAME, // Replies will come back to your email
-      subject: "Your New Admin Account Credentials",
-      html: `
-    <h1>Welcome to the Admin Team!</h1>
-    <p>Hello ${firstName} ${lastName},</p>
-    <p>Your admin account has been successfully created.</p>
-    <p><strong>Login Credentials:</strong></p>
-    <ul>
-      <li><strong>Email:</strong> ${email}</li>
-      <li><strong>Temporary Password:</strong> ${password}</li>
-    </ul>
-    <p style="color: red;">Please change your password after first login.</p>
-    <p>Best regards,<br>Your App Team</p>
-  `,
-    };
-
-
-    // Send email (fire-and-forget, don't await)
-    transporter.sendMail(mailOptions, (error, info) => {
-      if (error) {
-        console.error("Email sending error:", error);
-      } else {
-        console.log("Email sent:", info.response);
-      }
-    });
+    // Send email with credentials
+    const emailSubject = "Your New Admin Account Credentials";
+    const emailText = `Hello ${firstName} ${lastName},\n\nYour admin account has been successfully created.\n\nLogin Credentials:\nEmail: ${email}\nTemporary Password: ${password}\n\nPlease change your password after first login.\n\nBest regards,\nCrafted By Her Team`;
+    const emailHtml = `
+      <h1>Welcome to the Admin Team!</h1>
+      <p>Hello ${firstName} ${lastName},</p>
+      <p>Your admin account has been successfully created.</p>
+      <p><strong>Login Credentials:</strong></p>
+      <ul>
+        <li><strong>Email:</strong> ${email}</li>
+        <li><strong>Temporary Password:</strong> ${password}</li>
+      </ul>
+      <p style="color: red;">Please change your password after first login.</p>
+      <p>Best regards,<br>Crafted By Her Team</p>
+    `;
+    // Fire-and-forget email sending
+    sendEmail(email, emailSubject, emailText, emailHtml)
+      .then(() => console.log(`Email sent successfully to ${email}`))
+      .catch((error) => console.error("Email sending error:", error));
 
     // Prepare response
     const response = {
@@ -257,24 +193,25 @@ const createAdmin = async (req, res) => {
     });
   }
 };
+
 // Get All Admins
 const getAdmins = async (req, res) => {
   try {
     // Find all admin users by joining User and Admin collections
     const admins = await User.aggregate([
       {
-        $match: { role: "admin" } // Only get users with admin role
+        $match: { role: "admin" }, // Only get users with admin role
       },
       {
         $lookup: {
           from: "admins", // Collection name in MongoDB (usually lowercase plural)
           localField: "_id",
           foreignField: "userId",
-          as: "adminDetails"
-        }
+          as: "adminDetails",
+        },
       },
       {
-        $unwind: "$adminDetails" // Convert the array to an object
+        $unwind: "$adminDetails", // Convert the array to an object
       },
       {
         $project: {
@@ -288,46 +225,79 @@ const getAdmins = async (req, res) => {
           isActive: 1,
           createdAt: 1,
           updatedAt: 1,
+          profilePhoto: 1,
           "adminDetails.canDeletePosts": 1,
           "adminDetails.canManageUsers": 1,
           "adminDetails.canHandleReports": 1,
           "adminDetails.createdBy": 1,
-          "adminDetails.createdAt": 1
-        }
+          "adminDetails.createdAt": 1,
+        },
       },
       {
-        $sort: { createdAt: -1 } // Sort by newest first
-      }
+        $sort: { createdAt: -1 }, // Sort by newest first
+      },
     ]);
 
     // Format the response with creator details
-    const adminsWithCreator = await Promise.all(admins.map(async admin => {
-      const creator = await User.findById(admin.adminDetails.createdBy)
-        .select('firstName lastName email')
-        .lean();
+    const adminsWithCreator = await Promise.all(
+      admins.map(async (admin) => {
+        const creator = await User.findById(admin.adminDetails.createdBy)
+          .select("firstName lastName email profilePhoto")
+          .lean();
 
-      return {
-        ...admin,
-        createdBy: creator ? {
-          name: `${creator.firstName} ${creator.lastName}`,
-          email: creator.email
-        } : null
-      };
-    }));
+        // Transform profilePhoto for admin and creator
+        let adminProfilePhoto = admin.profilePhoto?.url || admin.profilePhoto;
+        if (
+          adminProfilePhoto &&
+          typeof adminProfilePhoto === "string" &&
+          !adminProfilePhoto.startsWith("http")
+        ) {
+          adminProfilePhoto = `${
+            process.env.BASE_URL || "http://localhost:8080"
+          }${adminProfilePhoto}`;
+        }
+
+        let creatorProfilePhoto =
+          creator?.profilePhoto?.url || creator?.profilePhoto;
+        if (
+          creatorProfilePhoto &&
+          typeof creatorProfilePhoto === "string" &&
+          !creatorProfilePhoto.startsWith("http")
+        ) {
+          creatorProfilePhoto = `${
+            process.env.BASE_URL || "http://localhost:8080"
+          }${creatorProfilePhoto}`;
+        }
+
+        return {
+          ...admin,
+          profilePhoto: adminProfilePhoto,
+          createdBy: creator
+            ? {
+                name: `${creator.firstName} ${creator.lastName}`,
+                email: creator.email,
+                profilePhoto: creatorProfilePhoto,
+              }
+            : null,
+        };
+      })
+    );
 
     res.status(200).json({
       count: adminsWithCreator.length,
-      admins: adminsWithCreator
+      admins: adminsWithCreator,
     });
   } catch (error) {
     console.error("Error fetching admins:", error);
     res.status(500).json({
       error: "Failed to fetch admins",
-      details: process.env.NODE_ENV === "development" ? error.message : undefined
+      details:
+        process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 };
 
+// Delete Admin
 const deleteAdmin = async (req, res) => {
   try {
     const { adminId } = req.params;
@@ -339,6 +309,12 @@ const deleteAdmin = async (req, res) => {
 
     if (!result) {
       return res.status(404).json({ error: "Admin not found" });
+    }
+
+    // Delete the user's profile photo from Cloudinary if exists
+    const user = await User.findById(result.userId);
+    if (user && user.profilePhoto?.public_id) {
+      await deleteFile(user.profilePhoto.public_id);
     }
 
     // Delete the user account
@@ -356,9 +332,8 @@ const deleteAdmin = async (req, res) => {
 };
 
 module.exports = {
-  updateSuperAdminProfile,
   getDashboard,
   createAdmin,
+  getAdmins,
   deleteAdmin,
-  getAdmins
 };

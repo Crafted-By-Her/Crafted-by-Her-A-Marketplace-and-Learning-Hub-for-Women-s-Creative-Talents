@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Rating = require("../models/Rating");
 const Product = require("../models/Product");
 const { updateProductRatingStats } = require("./productController");
@@ -68,6 +69,102 @@ exports.addRating = async (req, res) => {
   } catch (err) {
     res.status(500).json({
       error: "Server error: " + err.message,
+    });
+  }
+};
+
+// Get ratings for products owned by the user
+exports.getUserProductRatings = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // Validate user ID
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: "Invalid user ID format" });
+    }
+
+    // Find products owned by the user
+    const userProducts = await Product.find({ userId }).select("_id").lean();
+    const productIds = userProducts.map((product) => product._id);
+
+    if (!productIds.length) {
+      return res.status(200).json({
+        success: true,
+        ratings: [],
+        message: "No products found for this user.",
+      });
+    }
+
+    // Find ratings for the user's products
+    const ratings = await Rating.find({ productId: { $in: productIds } })
+      .populate("productId", "title images category price")
+      .populate("userId", "firstName lastName profilePhoto email")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Transform ratings to include fullName and handle Cloudinary images
+    const transformedRatings = ratings.map((rating) => {
+      // Construct fullName
+      const fullName =
+        [rating.userId?.firstName, rating.userId?.lastName]
+          .filter(Boolean)
+          .join(" ")
+          .trim() || "Anonymous";
+
+      // Transform rater's profilePhoto
+      let profilePhoto =
+        rating.userId?.profilePhoto?.url || rating.userId?.profilePhoto;
+      if (
+        profilePhoto &&
+        typeof profilePhoto === "string" &&
+        !profilePhoto.startsWith("http")
+      ) {
+        profilePhoto = `${
+          process.env.BASE_URL || "http://localhost:8080"
+        }${profilePhoto}`;
+      }
+
+      // Transform product images
+      const images =
+        rating.productId?.images?.map((image) => ({
+          url: image.url,
+          public_id: image.public_id,
+        })) || [];
+
+      return {
+        _id: rating._id,
+        product: {
+          _id: rating.productId?._id,
+          title: rating.productId?.title,
+          images,
+          category: rating.productId?.category,
+          price: rating.productId?.price,
+        },
+        rater: {
+          _id: rating.userId?._id,
+          email: rating.userId?.email,
+          fullName,
+          profilePhoto,
+        },
+        score: rating.score,
+        comment: rating.comment,
+        createdAt: rating.createdAt,
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      ratings: transformedRatings,
+    });
+  } catch (err) {
+    console.error("Error in getUserProductRatings:", {
+      error: err.message,
+      stack: err.stack,
+      userId: req.user?._id,
+    });
+    res.status(500).json({
+      error: "Failed to fetch product ratings",
+      details: process.env.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };

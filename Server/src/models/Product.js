@@ -23,18 +23,33 @@ const productSchema = new mongoose.Schema(
     },
     images: [
       {
-        type: String,
-        validate: {
-          validator: function (url) {
-            // Allow both URLs and local paths
-            return /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$|^\/uploads\/[^\s]+$/i.test(
-              url
-            );
+        url: {
+          type: String,
+          required: true,
+          validate: {
+            validator: function (value) {
+              // Validate that the URL is a valid Cloudinary URL
+              return /^https:\/\/res\.cloudinary\.com\/[^\s/$.?#].[^\s]*$/i.test(
+                value
+              );
+            },
+            message: (props) => `${props.value} is not a valid Cloudinary URL`,
           },
-          message: (props) => `${props.value} is not a valid image URL or path`,
+        },
+        public_id: {
+          type: String,
+          required: true,
+          validate: {
+            validator: function (value) {
+              // Validate that the public_id follows Cloudinary's format (e.g., "products/abc123")
+              return /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+$/.test(value);
+            },
+            message: (props) =>
+              `${props.value} is not a valid Cloudinary public_id`,
+          },
         },
       },
-    ],
+    ], // Updated to store Cloudinary URL and public_id
     contactInfo: {
       type: String,
       required: true,

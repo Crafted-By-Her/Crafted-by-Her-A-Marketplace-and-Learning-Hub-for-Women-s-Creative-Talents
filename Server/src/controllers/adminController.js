@@ -1,5 +1,7 @@
 const { User, Admin, Product } = require("../models");
 const bcrypt = require("bcrypt");
+const { deleteFile } = require("../middlewares/upload");
+const sendEmail = require("../services/sendEmail");
 
 // Admin: Change password (after login)
 exports.changePassword = async (req, res) => {
@@ -88,6 +90,7 @@ exports.getAllProducts = async (req, res) => {
           averageRating: 1,
           ratingDistribution: 1,
           userId: 1,
+          images: 1, // Include images field
           createdAt: 1,
           updatedAt: 1,
           isActive: 1,
@@ -120,12 +123,23 @@ exports.getAllProducts = async (req, res) => {
           updatedAt: 1,
           isActive: 1,
           overallScore: 1,
+          images: {
+            $map: {
+              input: "$images",
+              as: "image",
+              in: {
+                url: "$$image.url",
+                public_id: "$$image.public_id",
+              },
+            },
+          },
           userId: {
             _id: "$userDetails._id",
             firstName: "$userDetails.firstName",
             lastName: "$userDetails.lastName",
             email: "$userDetails.email",
             warnings: "$userDetails.warnings",
+            profilePhoto: "$userDetails.profilePhoto",
           },
         },
       },
@@ -133,10 +147,32 @@ exports.getAllProducts = async (req, res) => {
       { $sort: { overallScore: 1 } },
     ]);
 
+    // Transform user profilePhoto for response
+    const transformedProducts = products.map((product) => {
+      let profilePhoto =
+        product.userId?.profilePhoto?.url || product.userId?.profilePhoto;
+      if (
+        profilePhoto &&
+        typeof profilePhoto === "string" &&
+        !profilePhoto.startsWith("http")
+      ) {
+        profilePhoto = `${
+          process.env.BASE_URL || "http://localhost:8080"
+        }${profilePhoto}`;
+      }
+      return {
+        ...product,
+        userId: {
+          ...product.userId,
+          profilePhoto,
+        },
+      };
+    });
+
     res.json({
       message: "All products retrieved successfully",
-      count: products.length,
-      products,
+      count: transformedProducts.length,
+      products: transformedProducts,
     });
   } catch (error) {
     console.error(
@@ -152,16 +188,32 @@ exports.deleteProduct = async (req, res) => {
   try {
     const { productId } = req.params;
 
-    const deletedProduct = await Product.findByIdAndDelete(productId);
+    const deletedProduct = await Product.findById(productId);
     if (!deletedProduct) {
       return res.status(404).json({ error: "Product not found" });
     }
+
+    // Delete associated images from Cloudinary
+    if (deletedProduct.images && deletedProduct.images.length > 0) {
+      for (const image of deletedProduct.images) {
+        if (image.public_id) {
+          await deleteFile(image.public_id);
+        }
+      }
+    }
+
+    // Delete the product
+    await Product.findByIdAndDelete(productId);
 
     res.json({
       message: "Product deleted successfully",
       deletedProductId: productId,
     });
   } catch (error) {
+    console.error(
+      "🔥 ERROR in deleteProduct:",
+      JSON.stringify(error, Object.getOwnPropertyNames(error))
+    );
     res.status(500).json({ error: error.message });
   }
 };
@@ -181,10 +233,33 @@ exports.incrementUserWarning = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Auto-deactivate if warnings reach 3
-    if (user.warnings >= 3) {
+    // Send email when warnings reach 3
+    if (user.warnings === 3) {
+      const emailSubject = "Warning: Account Violation Notice";
+      const emailText = `Dear ${user.firstName} ${user.lastName},\n\nYour account has received 3 warnings due to policy violations. Further violations may lead to account deactivation. Please review our terms of service.\n\nBest regards,\nThe Support Team`;
+      try {
+        await sendEmail(user.email, emailSubject, emailText);
+      } catch (emailError) {
+        console.error("Failed to send warning email:", emailError);
+        // Continue execution even if email fails
+      }
+    }
+
+    // Auto-deactivate if warnings reach 5
+    if (user.warnings >= 5) {
       user.isActive = false;
       await user.save();
+
+      // Send deactivation email
+      const emailSubject = "Account Deactivated";
+      const emailText = `Dear ${user.firstName} ${user.lastName},\n\nYour account has been deactivated due to receiving 5 warnings for policy violations. Contact support for further assistance.\n\nBest regards,\nThe Support Team`;
+      try {
+        await sendEmail(user.email, emailSubject, emailText);
+      } catch (emailError) {
+        console.error("Failed to send deactivation email:", emailError);
+        // Continue execution even if email fails
+      }
+
       return res.json({
         message: "User warning incremented and account deactivated",
         userId: user._id,
@@ -200,10 +275,15 @@ exports.incrementUserWarning = async (req, res) => {
       isActive: user.isActive,
     });
   } catch (error) {
+    console.error(
+      "🔥 ERROR in incrementUserWarning:",
+      JSON.stringify(error, Object.getOwnPropertyNames(error))
+    );
     res.status(500).json({ error: error.message });
   }
 };
 
+// Admin/Super Admin: Activate user and reset warnings
 exports.activateUser = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -225,6 +305,16 @@ exports.activateUser = async (req, res) => {
     user.isActive = true;
     user.warnings = 0;
     await user.save();
+
+    // Send reactivation email
+    const emailSubject = "Account Reactivated";
+    const emailText = `Dear ${user.firstName} ${user.lastName},\n\nYour account has been reactivated, and your warnings have been reset to 0. You can now access all features. Please adhere to our terms of service to avoid future issues.\n\nBest regards,\nThe Support Team`;
+    try {
+      await sendEmail(user.email, emailSubject, emailText);
+    } catch (emailError) {
+      console.error("Failed to send reactivation email:", emailError);
+      // Continue execution even if email fails
+    }
 
     res.json({
       message: "User activated and warnings reset successfully",
