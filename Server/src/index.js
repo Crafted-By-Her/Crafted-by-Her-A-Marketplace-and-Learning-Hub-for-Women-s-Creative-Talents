@@ -13,7 +13,8 @@ const adminRoutes = require("./routes/adminRoutes");
 const productRoutes = require("./routes/products");
 const ratingRoutes = require("./routes/ratingRoutes");
 const reportRoutes = require("./routes/reportRoutes");
-const swaggerDocument = yaml.load("./swagger.yaml");
+const swaggerDocument = yaml.load(path.join(__dirname, 'swagger.yaml'));
+
 
 const cors = require("cors");
 
