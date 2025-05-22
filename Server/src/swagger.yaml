@@ -6,7 +6,7 @@ info:
 servers:
   - url: http://localhost:8080
     description: Local development server
-  - url: https://functional-full-s-int.trycloudflare.com
+  - url: https://crafted-by-her-backend.onrender.com
     description: Production server
 tags:
   - name: Auth
@@ -42,6 +42,33 @@ components:
         description:
           type: string
           description: Product description
+        category:
+          type: string
+          enum: ["Clothes", "Shoes", "Jewelries", "Beauties", "Bags", "Arts"]
+          description: Product category
+        price:
+          type: number
+          description: Product price
+        images:
+          type: array
+          items:
+            type: object
+            properties:
+              url:
+                type: string
+                description: Cloudinary URL of the image
+                example: "https://res.cloudinary.com/djn1y2bba/image/upload/v1747836395/products/sbzowi6rzclvp9fh3hbn.jpg"
+              public_id:
+                type: string
+                description: Cloudinary public ID of the image
+                example: "products/sbzowi6rzclvp9fh3hbn"
+            required:
+              - url
+              - public_id
+          description: Array of product images
+        contactInfo:
+          type: string
+          description: Contact information (usually user's email)
         userId:
           type: object
           properties:
@@ -57,6 +84,18 @@ components:
             email:
               type: string
               description: User's email
+            profilePhoto:
+              type: object
+              properties:
+                url:
+                  type: string
+                  description: Cloudinary URL of the user's profile photo
+                  example: "https://res.cloudinary.com/djn1y2bba/image/upload/v1747836395/profilePhotos/xyz789.jpg"
+                public_id:
+                  type: string
+                  description: Cloudinary public ID of the profile photo
+                  example: "profilePhotos/xyz789"
+              description: User's profile photo
             warnings:
               type: integer
               description: Number of warnings issued to the user
@@ -66,7 +105,10 @@ components:
             - email
         averageRating:
           type: number
-          description: Average rating of the product
+          description: Average rating of the product (1-5)
+        ratingCount:
+          type: number
+          description: Number of ratings for the product
         isActive:
           type: boolean
           description: Product activation status
@@ -78,22 +120,143 @@ components:
           type: string
           format: date-time
           description: Product last update timestamp
-        overallScore:
-          type: number
-          description: Overall score of the product
       required:
         - _id
         - title
-        - description
+        - category
+        - price
         - userId
+        - contactInfo
         - isActive
         - createdAt
         - updatedAt
-        - overallScore
+    ProductWithRatings:
+      type: object
+      properties:
+        _id:
+          type: string
+          description: Unique product identifier
+        title:
+          type: string
+          description: Product title
+        description:
+          type: string
+          description: Product description
+        category:
+          type: string
+          enum: ["Clothes", "Shoes", "Jewelries", "Beauties", "Bags", "Arts"]
+          description: Product category
+        price:
+          type: number
+          description: Product price
+        images:
+          type: array
+          items:
+            type: object
+            properties:
+              url:
+                type: string
+                description: Cloudinary URL of the image
+                example: "https://res.cloudinary.com/djn1y2bba/image/upload/v1747836395/products/sbzowi6rzclvp9fh3hbn.jpg"
+              public_id:
+                type: string
+                description: Cloudinary public ID of the image
+                example: "products/sbzowi6rzclvp9fh3hbn"
+            required:
+              - url
+              - public_id
+          description: Array of product images
+        contactInfo:
+          type: string
+          description: Contact information (usually user's email)
+        userId:
+          type: object
+          properties:
+            _id:
+              type: string
+              description: User ID
+            firstName:
+              type: string
+              description: User's first name
+            lastName:
+              type: string
+              description: User's last name
+            email:
+              type: string
+              description: User's email
+            profilePhoto:
+              type: string
+              description: Cloudinary URL of the user's profile photo
+              example: "https://res.cloudinary.com/djn1y2bba/image/upload/v1747836395/profilePhotos/xyz789.jpg"
+            warnings:
+              type: integer
+              description: Number of warnings issued to the user
+          required:
+            - _id
+            - firstName
+            - email
+        ratings:
+          type: array
+          items:
+            type: object
+            properties:
+              userId:
+                type: string
+                description: ID of the user who submitted the rating
+              userEmail:
+                type: string
+                description: Email of the user who submitted the rating
+              fullName:
+                type: string
+                description: Full name of the user who submitted the rating
+              profilePhoto:
+                type: string
+                description: Cloudinary URL of the user's profile photo
+                example: "https://res.cloudinary.com/djn1y2bba/image/upload/v1747836395/profilePhotos/xyz789.jpg"
+              score:
+                type: number
+                description: Rating score (1-5)
+              comment:
+                type: string
+                description: User comment on the product
+              createdAt:
+                type: string
+                format: date-time
+                description: Rating creation timestamp
+        averageRating:
+          type: number
+          description: Average rating of the product (1-5)
+        ratingCount:
+          type: number
+          description: Number of ratings for the product
+        isActive:
+          type: boolean
+          description: Product activation status
+        createdAt:
+          type: string
+          format: date-time
+          description: Product creation timestamp
+        updatedAt:
+          type: string
+          format: date-time
+          description: Product last update timestamp
+        id:
+          type: string
+          description: String representation of the product ID
+      required:
+        - _id
+        - title
+        - category
+        - price
+        - userId
+        - contactInfo
+        - isActive
+        - createdAt
+        - updatedAt
     User:
       type: object
       properties:
-        id:
+        _id:
           type: string
           description: Unique user identifier
         firstName:
@@ -109,42 +272,45 @@ components:
           type: string
           description: User's phone number
         profilePhoto:
-          type: string
-          description: URL to user's profile photo
+          type: object
+          properties:
+            url:
+              type: string
+              description: Cloudinary URL of the user's profile photo
+              example: "https://res.cloudinary.com/djn1y2bba/image/upload/v1747836395/profilePhotos/xyz789.jpg"
+            public_id:
+              type: string
+              description: Cloudinary public ID of the profile photo
+              example: "profilePhotos/xyz789"
+          description: User's profile photo
         gender:
           type: string
-          enum: [male, female, other]
+          enum: ["male", "female", "other"]
           description: User's gender
         role:
           type: string
-          enum: [user, admin, superadmin]
+          enum: ["user", "admin", "superAdmin"]
           description: User role
-        interfaceAccess:
-          type: object
-          properties:
-            dashboard:
-              type: string
-              description: Dashboard type
-            features:
-              type: array
-              items:
-                type: string
-              description: Accessible features
-          required:
-            - dashboard
-            - features
         warnings:
           type: integer
           description: Number of warnings issued to the user
         isActive:
           type: boolean
           description: User account activation status
+        createdAt:
+          type: string
+          format: date-time
+          description: User creation timestamp
       required:
-        - id
+        - _id
         - firstName
         - lastName
         - email
+        - phoneNumber
+        - gender
         - role
+        - isActive
+        - createdAt
     Rating:
       type: object
       properties:
@@ -157,19 +323,69 @@ components:
         userId:
           type: string
           description: ID of the user who submitted the rating
-        rating:
-          type: integer
+        score:
+          type: number
           minimum: 1
           maximum: 5
           description: Rating score (1-5)
         comment:
           type: string
           description: User comment on the product
+        createdAt:
+          type: string
+          format: date-time
+          description: Rating creation timestamp
       required:
         - _id
         - productId
         - userId
-        - rating
+        - score
+    UserRating:
+      type: object
+      properties:
+        productId:
+          type: object
+          properties:
+            _id:
+              type: string
+              description: Product ID
+            title:
+              type: string
+              description: Product title
+            images:
+              type: array
+              items:
+                type: object
+                properties:
+                  url:
+                    type: string
+                    description: Cloudinary URL of the image
+                    example: "https://res.cloudinary.com/djn1y2bba/image/upload/v1747836395/products/sbzowi6rzclvp9fh3hbn.jpg"
+                  public_id:
+                    type: string
+                    description: Cloudinary public ID of the image
+                    example: "products/sbzowi6rzclvp9fh3hbn"
+                required:
+                  - url
+                  - public_id
+              description: Array of product images
+        userId:
+          type: string
+          description: ID of the user who submitted the rating
+        score:
+          type: number
+          description: Rating score (1-5)
+        comment:
+          type: string
+          description: User comment on the product
+        createdAt:
+          type: string
+          format: date-time
+          description: Rating creation timestamp
+      required:
+        - productId
+        - userId
+        - score
     Report:
       type: object
       properties:
@@ -196,12 +412,15 @@ components:
         success:
           type: boolean
           default: false
-        message:
+        error:
           type: string
           description: Error message
+        details:
+          type: string
+          description: Detailed error information (development only)
       required:
         - success
-        - message
+        - error
     LoginRequest:
       type: object
       properties:
@@ -249,7 +468,7 @@ components:
           description: User's phone number
         gender:
           type: string
-          enum: [male, female, other]
+          enum: ["male", "female", "other"]
           description: User's gender
       required:
         - firstName
@@ -264,12 +483,103 @@ components:
         message:
           type: string
           description: Response message
+        user:
+          $ref: "#/components/schemas/User"
+      required:
+        - message
+        - user
+    ProductsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: Indicates if the request was successful
+        total:
+          type: integer
+          description: Total number of products
+        page:
+          type: integer
+          description: Current page number
+        pages:
+          type: integer
+          description: Total number of pages
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductWithRatings"
+      required:
+        - success
+        - total
+        - page
+        - pages
+        - data
+    UserProductsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: Indicates if the request was successful
+        count:
+          type: integer
+          description: Number of products returned
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/Product"
+      required:
+        - success
+        - count
+        - products
+    RatingsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: Indicates if the request was successful
+        count:
+          type: integer
+          description: Number of ratings returned
+        ratings:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserRating"
+      required:
+        - success
+        - count
+        - ratings
+    ReportsResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Response message
+        count:
+          type: integer
+          description: Number of reports returned
+        reports:
+          type: array
+          items:
+            $ref: "#/components/schemas/Report"
+      required:
+        - message
+        - count
+        - reports
+    UsersResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Response message
+        count:
+          type: integer
+          description: Number of users returned
         users:
           type: array
           items:
             $ref: "#/components/schemas/User"
       required:
         - message
+        - count
         - users
 paths:
   /api/auth/register:
@@ -336,16 +646,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                  count:
-                    type: integer
-                  products:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/Product"
+                $ref: "#/components/schemas/UserProductsResponse"
         "401":
           description: Unauthorized
           content:
@@ -366,16 +667,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                  count:
-                    type: integer
-                  ratings:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/Rating"
+                $ref: "#/components/schemas/RatingsResponse"
         "401":
           description: Unauthorized
           content:
@@ -395,14 +687,14 @@ paths:
             type: string
             enum:
               [
-                Clothes,
-                Shoes,
-                Jewelries,
-                Beauties,
-                Bags,
-                Arts,
-                All,
-                New Release,
+                "Clothes",
+                "Shoes",
+                "Jewelries",
+                "Beauties",
+                "Bags",
+                "Arts",
+                "All",
+                "New Release",
               ]
           description: Filter products by category
         - in: query
@@ -423,16 +715,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                  count:
-                    type: integer
-                  products:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/Product"
+                $ref: "#/components/schemas/ProductsResponse"
         "500":
           description: Server error
           content:
@@ -449,30 +732,41 @@ paths:
       requestBody:
         required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
               type: object
               properties:
                 title:
                   type: string
+                  description: Product title
                 description:
                   type: string
+                  description: Product description
                 category:
                   type: string
                   enum:
                     [
-                      Clothes,
-                      Shoes,
-                      Jewelries,
-                      Beauties,
-                      Bags,
-                      Arts,
-                      New Release,
+                      "Clothes",
+                      "Shoes",
+                      "Jewelries",
+                      "Beauties",
+                      "Bags",
+                      "Arts",
                     ]
+                  description: Product category
+                price:
+                  type: number
+                  description: Product price
+                images:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Product images to upload (up to 5)
               required:
                 - title
-                - description
                 - category
+                - price
       responses:
         "201":
           description: Product created successfully
@@ -503,15 +797,18 @@ paths:
               properties:
                 productId:
                   type: string
-                rating:
-                  type: integer
+                  description: ID of the product to rate
+                score:
+                  type: number
                   minimum: 1
                   maximum: 5
+                  description: Rating score (1-5)
                 comment:
                   type: string
+                  description: User comment on the product
               required:
                 - productId
-                - rating
+                - score
       responses:
         "201":
           description: Rating added successfully
@@ -527,7 +824,7 @@ paths:
                 $ref: "#/components/schemas/Error"
   /api/reports:
     get:
-      summary: Get product report
+      summary: Get product reports
       description: Retrieves reports for a specific product (admin access required)
       tags:
         - Reports
@@ -546,16 +843,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                  count:
-                    type: integer
-                  reports:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/Report"
+                $ref: "#/components/schemas/ReportsResponse"
         "401":
           description: Unauthorized
           content:
@@ -576,23 +864,14 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                  count:
-                    type: integer
-                  products:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/Product"
+                $ref: "#/components/schemas/UserProductsResponse"
         "401":
           description: Unauthorized
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-  /admin/products/{id}:
+  /api/admin/products/{id}:
     delete:
       summary: Delete product
       description: Deletes a product by ID (admin access required)
@@ -641,12 +920,16 @@ paths:
                 properties:
                   message:
                     type: string
+                    description: Response message
                   userId:
                     type: string
+                    description: ID of the user
                   warnings:
                     type: integer
+                    description: Updated number of warnings
                   isActive:
                     type: boolean
+                    description: Updated user activation status
         "401":
           description: Unauthorized
           content:
@@ -670,8 +953,10 @@ paths:
               properties:
                 oldPassword:
                   type: string
+                  description: Current password
                 newPassword:
                   type: string
+                  description: New password
               required:
                 - oldPassword
                 - newPassword
@@ -685,6 +970,7 @@ paths:
                 properties:
                   message:
                     type: string
+                    description: Response message
         "401":
           description: Unauthorized or invalid password
           content:
@@ -705,16 +991,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                  count:
-                    type: integer
-                  users:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/User"
+                $ref: "#/components/schemas/UsersResponse"
         "401":
           description: Unauthorized
           content:
@@ -784,21 +1061,27 @@ paths:
       requestBody:
         required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
               type: object
               properties:
                 firstName:
                   type: string
+                  description: Admin's first name
                 lastName:
                   type: string
+                  description: Admin's last name
                 profilePhoto:
                   type: string
+                  format: binary
+                  description: Admin's profile photo to upload
                 phoneNumber:
                   type: string
+                  description: Admin's phone number
                 gender:
                   type: string
-                  enum: [male, female, other]
+                  enum: ["male", "female", "other"]
+                  description: Admin's gender
       responses:
         "200":
           description: Profile updated successfully
@@ -879,16 +1162,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                  count:
-                    type: integer
-                  products:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/Product"
+                $ref: "#/components/schemas/UserProductsResponse"
         "401":
           description: Unauthorized
           content:
@@ -897,7 +1171,7 @@ paths:
                 $ref: "#/components/schemas/Error"
   /api/superadmin/dashboard:
     get:
-      summary: Admin dashboard
+      summary: SuperAdmin dashboard
       description: Retrieves dashboard data for superadmin (superadmin access required)
       tags:
         - SuperAdmin
@@ -913,15 +1187,19 @@ paths:
                 properties:
                   message:
                     type: string
+                    description: Response message
                   data:
                     type: object
                     properties:
                       totalUsers:
                         type: integer
+                        description: Total number of users
                       totalProducts:
                         type: integer
+                        description: Total number of products
                       totalReports:
                         type: integer
+                        description: Total number of reports
         "401":
           description: Unauthorized
           content:
@@ -945,17 +1223,23 @@ paths:
               properties:
                 email:
                   type: string
+                  description: Admin email
                 firstName:
                   type: string
+                  description: Admin's first name
                 lastName:
                   type: string
+                  description: Admin's last name
                 password:
                   type: string
+                  description: Admin password
                 phoneNumber:
                   type: string
+                  description: Admin's phone number
                 gender:
                   type: string
-                  enum: [male, female, other]
+                  enum: ["male", "female", "other"]
+                  description: Admin's gender
               required:
                 - email
                 - firstName
@@ -987,16 +1271,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                  count:
-                    type: integer
-                  admins:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/User"
+                $ref: "#/components/schemas/UsersResponse"
         "401":
           description: Unauthorized
           content:
@@ -1041,16 +1316,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                  count:
-                    type: integer
-                  users:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/User"
+                $ref: "#/components/schemas/UsersResponse"
         "401":
           description: Unauthorized
           content:
@@ -1068,21 +1334,27 @@ paths:
       requestBody:
         required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
               type: object
               properties:
                 firstName:
                   type: string
+                  description: SuperAdmin's first name
                 lastName:
                   type: string
+                  description: SuperAdmin's last name
                 profilePhoto:
                   type: string
+                  format: binary
+                  description: SuperAdmin's profile photo to upload
                 phoneNumber:
                   type: string
+                  description: SuperAdmin's phone number
                 gender:
                   type: string
-                  enum: [male, female, other]
+                  enum: ["male", "female", "other"]
+                  description: SuperAdmin's gender
       responses:
         "200":
           description: Profile updated successfully
