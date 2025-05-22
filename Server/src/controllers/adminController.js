@@ -288,40 +288,47 @@ exports.activateUser = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    // Find user
-    const user = await User.findById(userId);
-    if (!user) {
+    // First check current status
+    const userBeforeUpdate = await User.findById(userId);
+    if (!userBeforeUpdate) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Check if already active
-    if (user.isActive && user.warnings === 0) {
+    // Check if already active before updating
+    if (userBeforeUpdate.isActive && userBeforeUpdate.warnings === 0) {
       return res
         .status(400)
         .json({ error: "User is already active with no warnings" });
     }
 
-    // Activate user and reset warnings
-    user.isActive = true;
-    user.warnings = 0;
-    await user.save();
+    // Use direct update operation to bypass schema validation
+    const result = await User.updateOne(
+      { _id: userId },
+      {
+        $set: {
+          isActive: true,
+          warnings: 0,
+          profilePhoto: userBeforeUpdate.profilePhoto || null, // Preserve existing or set null
+        },
+      }
+    );
 
     // Send reactivation email
     const emailSubject = "Account Reactivated";
-    const emailText = `Dear ${user.firstName} ${user.lastName},\n\nYour account has been reactivated, and your warnings have been reset to 0. You can now access all features. Please adhere to our terms of service to avoid future issues.\n\nBest regards,\nThe Support Team`;
+    const emailText = `Dear ${userBeforeUpdate.firstName} ${userBeforeUpdate.lastName},\n\nYour account has been reactivated, and your warnings have been reset to 0. You can now access all features. Please adhere to our terms of service to avoid future issues.\n\nBest regards,\nThe Support Team`;
+
     try {
-      await sendEmail(user.email, emailSubject, emailText);
+      await sendEmail(userBeforeUpdate.email, emailSubject, emailText);
     } catch (emailError) {
       console.error("Failed to send reactivation email:", emailError);
-      // Continue execution even if email fails
     }
 
     res.json({
       message: "User activated and warnings reset successfully",
-      userId: user._id,
-      email: user.email,
-      isActive: user.isActive,
-      warnings: user.warnings,
+      userId: userBeforeUpdate._id,
+      email: userBeforeUpdate.email,
+      isActive: true,
+      warnings: 0,
     });
   } catch (error) {
     console.error(

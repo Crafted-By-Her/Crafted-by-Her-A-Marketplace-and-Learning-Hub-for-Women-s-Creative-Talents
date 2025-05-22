@@ -381,28 +381,58 @@ const updateUser = async (req, res) => {
       });
     }
 
-    const updated = await User.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    });
+    // Prepare the update object
+    const update = { ...req.body };
+
+    // Handle profilePhoto update if present
+    if (req.body.profilePhoto) {
+      if (typeof req.body.profilePhoto === "string") {
+        // Legacy string handling (optional: log or migrate)
+        console.log(
+          `Legacy profilePhoto string found: ${req.body.profilePhoto}`
+        );
+        update.profilePhoto = { url: null, public_id: null }; // Reset to null if not a valid upload
+      }
+      // Note: For file uploads, rely on upload middleware to set req.file
+      if (req.file) {
+        // Delete old profile photo from Cloudinary if exists
+        const existingUser = await User.findById(req.params.id);
+        if (existingUser.profilePhoto?.public_id) {
+          await deleteFile(existingUser.profilePhoto.public_id);
+        } else if (
+          typeof existingUser.profilePhoto === "string" &&
+          existingUser.profilePhoto
+        ) {
+          console.log(
+            `Legacy profilePhoto string found for user ${req.params.id}: ${existingUser.profilePhoto}`
+          );
+        }
+
+        // Set new profilePhoto with Cloudinary data
+        update.profilePhoto = {
+          url: req.file.path, // Cloudinary secure_url
+          public_id: req.file.filename, // Cloudinary public_id
+        };
+      }
+    }
+
+    const updated = await User.findByIdAndUpdate(
+      req.params.id,
+      { $set: update },
+      {
+        new: true,
+        runValidators: true,
+      }
+    ).lean();
 
     if (!updated) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Transform profilePhoto
-    let profilePhoto = updated.profilePhoto?.url || updated.profilePhoto;
-    if (
-      profilePhoto &&
-      typeof profilePhoto === "string" &&
-      !profilePhoto.startsWith("http")
-    ) {
-      profilePhoto = `${
-        process.env.BASE_URL || "http://localhost:8080"
-      }${profilePhoto}`;
-    }
+    // Transform profilePhoto for response
+    const profilePhoto = updated.profilePhoto?.url || null;
 
-    res.json({ ...updated.toObject(), profilePhoto });
+    res.json({ ...updated, profilePhoto });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

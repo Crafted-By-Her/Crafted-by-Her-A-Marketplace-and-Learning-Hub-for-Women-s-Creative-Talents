@@ -24,35 +24,53 @@ const UserSchema = new mongoose.Schema({
     default: "user",
   },
   profilePhoto: {
-    url: {
-      type: String,
-      default: null, // Default to null if no photo is uploaded
-      validate: {
-        validator: function (value) {
-          // Validate that the URL is a valid Cloudinary URL
+    type: mongoose.Schema.Types.Mixed, // Changed to Mixed type
+    default: null,
+    validate: {
+      validator: function (value) {
+        // Allow null
+        if (value === null) return true;
+
+        // Allow empty string (for backward compatibility)
+        if (value === "") return true;
+
+        // Allow object with url and public_id
+        if (typeof value === "object" && value.url && value.public_id) {
           return (
-            value === null ||
-            /^https:\/\/res\.cloudinary\.com\/[^\s/$.?#].[^\s]*$/i.test(value)
+            /^https:\/\/res\.cloudinary\.com\/[^\s/$.?#].[^\s]*$/i.test(
+              value.url
+            ) && /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+$/.test(value.public_id)
           );
-        },
-        message: (props) => `${props.value} is not a valid Cloudinary URL`,
-      },
-    },
-    public_id: {
-      type: String,
-      default: null, // Default to null if no photo is uploaded
-      validate: {
-        validator: function (value) {
-          // Validate that the public_id follows Cloudinary's format (e.g., "profilePhotos/abc123")
-          return (
-            value === null || /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+$/.test(value)
+        }
+
+        // Allow just a URL string (for backward compatibility)
+        if (typeof value === "string") {
+          return /^https:\/\/res\.cloudinary\.com\/[^\s/$.?#].[^\s]*$/i.test(
+            value
           );
-        },
-        message: (props) =>
-          `${props.value} is not a valid Cloudinary public_id`,
+        }
+
+        return false;
       },
+      message: (props) =>
+        `Invalid profilePhoto format: ${JSON.stringify(props.value)}`,
     },
-  }, // Updated to store Cloudinary URL and public_id
+    set: function (value) {
+      // Convert empty string to null
+      if (value === "") return null;
+
+      // Convert URL string to object
+      if (typeof value === "string" && value.startsWith("http")) {
+        return {
+          url: value,
+          public_id: `profilePhotos/${mongoose.Types.ObjectId()}`,
+        };
+      }
+
+      return value;
+    },
+  },
+
   warnings: { type: Number, default: 0 },
   isActive: { type: Boolean, default: true },
   createdAt: { type: Date, default: Date.now },
