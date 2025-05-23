@@ -999,7 +999,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
   /api/admin/users/{id}/activate:
-    patch:
+    put:
       summary: Activate user
       description: Activates a user account (admin access required)
       tags:
